@@ -90,3 +90,84 @@ plot_daily_change('Florida')
 melt_cols = ['Province_State','Admin2'] + date_cols
 cases_df = cases_df[melt_cols].melt(id_vars=['Province_State','Admin2'],var_name='Date',value_name='Case_Count')
 deaths_df = deaths_df[melt_cols].melt(id_vars=['Province_State','Admin2'],var_name='Date',value_name='Death_Count')
+
+
+
+
+
+
+
+
+# plot bar chart as heatmap
+
+import matplotlib
+cmap = matplotlib.cm.get_cmap('Reds',6)
+colors=[]
+for i in range(cmap.N):
+    rgb = cmap(i)[:3]
+    colors.append(matplotlib.colors.rgb2hex(rgb))
+    
+nbins = 6
+blabels = [i for i in range(nbins)]
+test_df['Bin'] = pd.cut(test_df['New_Cases'],bins=nbins,labels=colors)
+#.plot.bar()
+
+above_avg_mask = test_plot_df['new'] >= test_plot_df['new'].mean()
+below_avg_mask = test_plot_df['new'] < test_plot_df['new'].mean()
+
+test_df = test_df.reset_index().rename(columns={'index':'Date'})
+test_df['Bar'] = 1
+plt.figure(figsize=(14, .5))
+test_df['Bar'].plot.bar(width=.95,color=test_df['Bin'].to_list())
+plt.axis('off')
+
+
+
+
+
+
+
+
+
+# plot daily change in cases/deaths for a given state or county
+
+def plot_daily_change(state,county=False,report_type='cases',time_frame='all'):
+    """Plots the daily change in cases/deaths for a given state or county.
+
+Accepted `report_type` values are:
+ - 'cases': case data
+ - 'deaths': death data
+    
+"""
+    first_reported_case = states_df.loc[('cases',state)].sum().ne(0).idxmax()
+    
+    plot_dates = date_cols[date_cols.index(first_reported_case)-2:]
+
+    plot_df = states_df.loc[(report_type,state,county)].diff()[plot_dates] if county else \
+                states_df.loc[(report_type,state)].sum().diff()[plot_dates]
+
+    plt.figure(figsize=(12, 5))
+    
+    color = 'tab:red' if report_type=='cases' else 'tab:gray'
+    
+    daily_cases = plot_df.plot(kind='bar',color=color,alpha=.4)
+    
+    average_cases = plot_df.rolling(7,center=True).mean()
+    average_cases.plot(linewidth=2,color=color)
+    
+    plt.xticks(ticks=np.arange(0,len(plot_dates), 15),labels=plot_dates[::15], \
+                rotation=45,ha='right')
+    
+    plt.title(f"""Seven-day rolling average of daily COVID-19 {report_type} for { \
+                f'{county} County, ' if county else ''}{state} as of {date_cols[-1]}""")
+    
+    plt.ylabel(f'Number of {report_type}')
+    plt.xlabel('Date')
+    plt.legend().remove()
+    
+    for i in list(plt.yticks()[0][::2]):
+        plt.axhline(y=i,linewidth=1.25, color='lightgray',alpha=.75, \
+                    linestyle='dashed',zorder=-5)
+   
+    plt.fill_between(plot_dates,average_cases,color=color,alpha=.15)
+    plt.show()
