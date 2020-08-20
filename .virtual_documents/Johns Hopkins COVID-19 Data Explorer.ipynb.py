@@ -80,42 +80,82 @@ states_df.loc[report_type].groupby(level='Province_State').sum().diff(axis=1)[da
 states_df.loc['cases'].groupby('Province_State').sum()[[date_cols[-8],today]].diff(axis=1)[date_cols[-1]]#.sort_values(ascending=False).head()
 
 
+states_df
+
+
+
+
+
 # cases in the last 7 days
 weekly_change_df = states_df.loc['cases'].groupby('Province_State').sum().diff(axis=1,periods=7)[today].to_frame(name='new_cases')
 weekly_change_df['total_cases'] = states_df.groupby('Province_State').sum()[today]
 weekly_change_df['pct_change'] = weekly_change_df['new_cases']/weekly_change_df['total_cases']
 
 cm = sns.light_palette("red", as_cmap=True)
-weekly_change_df.sort_values(by='pct_change', ascending=False).style.background_gradient(cmap=cm)
+weekly_change_df.sort_values(by='pct_change', ascending=False)#.style.background_gradient(cmap=cm)
+
+
+states_df
 
 
 # calculate totals, change, and percent change based on weekly interval
 interval= 7
-start = (len(date_cols) % interval) - 1
+start = ((len(date_cols) - 1) % interval)
 weekly_change_df = states_df.loc['cases'].groupby('Province_State').sum().diff(axis=1,periods=7)[date_cols[start::interval]] # weekly change ending on date
 weekly_totals_df = states_df.loc['cases'].groupby('Province_State').sum()[date_cols[start::interval]] # case totals ending on date
-weekly_change_pct_df = weekly_change_df/weekly_totals_df # percent of weekly change over total cases
+weekly_change_pct_df = (weekly_change_df/weekly_totals_df)*100 # percent of weekly change over total cases
 
-cm = sns.diverging_palette(240, 5, as_cmap=True)
-weekly_change_pct_df.diff(axis=1)[weekly_change_pct_df.columns[-10:]].style.background_gradient(cmap=cm).highlight_null('white') # change in weekly percentage from week to week
+# cm = sns.light_palette("red", as_cmap=True)
+# weekly_change_pct_df[weekly_change_pct_df.columns[-10:]].style.background_gradient(cmap=cm).highlight_null('white') # change in weekly percentage from week to week
+
+cm = sns.diverging_palette(120,10, as_cmap=True)
+weekly_change_pct_df.diff(axis=1)[weekly_change_pct_df.columns[-8:]].style.background_gradient(cmap=cm).highlight_null('white') # change in weekly percentage from week to week
 
 
 def plot_county_heatmaps(state,report_type='cases'):
-    test_df = states_df.loc[(report_type,state)][date_cols].sort_values(by=[date_cols[-1]],ascending=False).diff(axis=1).fillna(0).head(8)
+    test_df = states_df.loc[(report_type,state)][date_cols].sort_values(by=[date_cols[-1]],ascending=False).diff(axis=1).fillna(0).head(5)
     test_df = test_df[date_cols].where(~(test_df[date_cols]<0), other=np.nan)
     counties = test_df.index.to_list()
-
-    fig, ax = plt.subplots(len(counties),1,figsize=(14, len(counties)/1.5))
+    fig, ax = plt.subplots(len(counties)+1,1,figsize=(12, len(counties)/1.5))
     for i,county in enumerate(counties):
         nbins = 4
         bin_labels = [i for i in range(nbins)]
         plot = pd.cut(test_df.loc[county],bins=nbins,labels=bin_labels).astype('float').to_frame(name='cases').transpose()
         sns.heatmap(plot,cmap='Reds',cbar=False,yticklabels=[county],xticklabels=False,ax=ax[i])
         plt.setp(ax[i].yaxis.get_majorticklabels(), rotation=0)
-
+    sns.heatmap(pd.DataFrame([1,2,3,4]).transpose(),cmap='Reds',cbar=False,ax=ax[-1],yticklabels=False, xticklabels=['Less','','','More'])
+    ax[0].title.set_text(f'Daily Reported Cases in {state} - Top 5 Counties with Highest Total Cases\n') 
     plt.show()
     
-plot_county_heatmaps('Massachusetts')
+plot_county_heatmaps('Florida')
+
+
+def plot_state_heatmaps(report_type='cases',n_states=10):
+    daily_cases_df = states_df.loc[report_type].groupby('Province_State').sum()[date_cols]
+    daily_cases_df = daily_cases_df.sort_values(by=[date_cols[-1]],ascending=False).diff(axis=1).head(n_states)
+    daily_cases_df = daily_cases_df[date_cols].where(~(daily_cases_df[date_cols]<0), other=np.nan)
+    states = daily_cases_df.index.to_list()
+    fig, ax = plt.subplots(len(states)+1,1,figsize=(12, len(states)/2))
+    for i,state in enumerate(states):
+        nbins = 5
+        bin_labels = [i for i in range(nbins)]
+        plot = pd.cut(daily_cases_df.loc[state],bins=nbins,labels=bin_labels).astype('float').to_frame().transpose()
+        sns.heatmap(plot,cmap='Reds',vmin=-.5,cbar=False,yticklabels=[state],xticklabels=False,ax=ax[i])
+        plt.setp(ax[i].yaxis.get_majorticklabels(), rotation=0)
+    cbar = pd.DataFrame(range(nbins)).transpose()
+    sns.heatmap(cbar,cmap='Reds',vmin=-.5,cbar=False,ax=ax[-1],yticklabels=False, xticklabels=['Fewer','','','','More'])
+    ax[0].title.set_text(f'Daily Reported COVID-19 {report_type}'
+                         f' - Top {n_states} States with Highest Total {report_type}'
+                         f' - {date_cols[0]} through {date_cols[-1]}\n') 
+    plt.show()
+
+print()
+print()
+print()
+    
+plot_state_heatmaps(n_states=20)
+
+print()
 
 
 # get cumulateive case and death counts
